@@ -21,9 +21,31 @@ class SettingsStore:
             return default
 
     def save_volume(self, value: int) -> None:
-        payload = {"volume": max(0, min(100, int(value)))}
+        self._merge({"volume": max(0, min(100, int(value)))})
+
+    def load_playback_rate(self, default: float = 1.0) -> float:
+        if not self.path.exists():
+            return default
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            value = float(data.get("playback_rate", default))
+            return value if value > 0 else default
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return default
+
+    def save_playback_rate(self, value: float) -> None:
+        self._merge({"playback_rate": float(value)})
+
+    def _merge(self, update: dict) -> None:
+        data = {}
+        if self.path.exists():
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, json.JSONDecodeError):
+                data = {}
+        data.update(update)
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(payload), encoding="utf-8")
+            self.path.write_text(json.dumps(data), encoding="utf-8")
         except OSError:
             pass

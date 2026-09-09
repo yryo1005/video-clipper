@@ -1,37 +1,91 @@
 # Video Clipper
 
-YouTube から動画を取り込み、範囲指定してクリップを書き出す Windows 用アプリです。
-元の単一ファイルプロトタイプ (`VideoClipper.py`) と同じ操作感を保ちつつ、UI / 再生 / ダウンロード / 書き出しを分けています。
+YouTube から動画を取り込み、範囲を指定してクリップとして書き出す Windows 用デスクトップアプリです。
+PyQt6 製で、ダウンロード・再生・波形表示・書き出し・クリップ管理(リネーム/ゴミ箱)を1つのウィンドウで行えます。
 
 ## 必要なもの
 
 - Python 3.11 以上
-- [ffmpeg](https://ffmpeg.org/)（PATH に通す）
-- [Deno](https://deno.com/)（YouTube ダウンロード用。未導入なら winget で `DenoLand.Deno`）
+- [ffmpeg](https://ffmpeg.org/)(PATH に通しておく。クリップ書き出し・サムネイル生成・波形生成に使用)
+- [Deno](https://deno.com/)(任意。YouTube ダウンロード時の署名解決に使われ、無いと一部の動画で 403 エラーが出ることがある。未導入なら `winget install DenoLand.Deno`)
+- PyQt6, yt-dlp などの Python パッケージ(`requirements.txt` に記載、初回起動時に自動インストール)
 
-## 起動
+## セットアップ・起動方法
 
-デスクトップの `VideoClipper.bat`、またはプロジェクト直下の同じファイルをダブルクリックします。
+### デスクトップから起動する場合(推奨)
 
-初回だけ仮想環境の作成とパッケージ導入が走ります。
+デスクトップの `VideoClipper` ショートカットをダブルクリックします。
+初回のみ `.venv` の作成と依存パッケージのインストールが自動で走るため少し時間がかかります。2回目以降はすぐに起動します。
 
-手動で起動する場合:
+ショートカットが無い/消えてしまった場合は、プロジェクト直下の `VideoClipper.bat` を右クリックして「送る」→「デスクトップ(ショートカットを作成)」で作り直せます。
+
+### コマンドから起動する場合
+
+```bat
+cd /d C:\Users\Ryo\workspace\video-clipper
+VideoClipper.bat
+```
+
+### 手動で仮想環境を使う場合
 
 ```bat
 cd /d C:\Users\Ryo\workspace\video-clipper
 .venv\Scripts\python.exe -m videoclipper
 ```
 
-## 操作
+## 使い方
 
-- **Open**: ローカル動画を開く
-- **Download**: YouTube URL を保存して読み込む
-- 緑 / 赤スライダー: Start / End。右クリックで現在位置に合わせる
-- End 指定時は 2 秒前からプレビュー
-- スペース / 映像クリック: 再生・一時停止
-- **EXPORT**: `Videos\MyClips` にクリップ保存
-- History: 書き出したクリップ。右クリックで削除
+### 1. 動画を読み込む
 
-クリップ出力先は従来どおり `%USERPROFILE%\Videos\MyClips` です。
-YouTube の取り込み先は `%USERPROFILE%\Videos\VideoClipper\downloads` です。
-音量は `%APPDATA%\VideoClipper\settings.json` に保存します。
+- **⬇ Download**: ボタンを押すとダイアログが開くので YouTube の URL を入力する。ダウンロード中に続けて別の URL で押すと、順番に処理されるキューに追加される(待機中の URL は一覧表示される)。
+- **ドラッグ&ドロップ**: ローカルの動画ファイル(`.mp4` `.mkv` `.avi` `.mov`)をウィンドウにドラッグ&ドロップしても読み込める。
+- 履歴の **Clips** パネルでクリップをクリックしても再生できる。
+
+### 2. 再生・範囲(Start/End)の指定
+
+- 映像クリック / **Space** キー: 再生・一時停止。
+- 上のバー(Current バー): 現在の再生位置。クリック/ドラッグでシークできる。
+- 下の波形バー: 音声の波形が表示され、選択中の Start〜End の範囲が色付けされる。
+  - **左クリック**: 今の再生位置を **Start** にする(波形上のクリックした位置ではなく、現在再生している時間が使われる)
+  - **右クリック**: 今の再生位置を **End** にする
+  - `I` キー: Start を現在位置にする(左クリックと同じ)
+  - `O` キー: End を現在位置にする(右クリックと同じ)
+  - End を設定すると、その 1 秒前の位置にプレビューが移動する
+- **⟲ Reset**: Start を動画の先頭、End を動画の末尾に戻す。
+- **Start: -1s / -0.1s / +0.1s / +1s**、**End: -1s / -0.1s / +0.1s / +1s**: それぞれの時間を細かく微調整するボタン(減算は青、加算は赤で色分け)。
+- **←** / **→** キー: 現在位置を約1フレーム分移動(**Shift** を押しながらだと 1 秒移動)。
+- 🔊 音量スライダー、⏱ 再生速度(0.25x〜2x): 設定は次回起動時も保持される。
+
+### 3. クリップを書き出す
+
+1. **Video:** 欄に動画(プロジェクト)名を入力する(動画を読み込むとファイル名から自動入力される)。
+2. Start/End を決めたら **✨ EXPORT** を押す。バックグラウンドで処理され、進捗バーが表示される。
+3. `Videos\MyClips\<Video名>\` フォルダの中に `001.mp4`, `002.mp4`, ... と自動採番されたファイル名で保存される。
+4. 書き出しが終わると確認ダイアログは出ず、次のクリップの Start が自動で「今書き出したクリップの End」に、End が「動画の末尾」にセットされる。同じ動画から続けて何本もクリップを作る作業がしやすいようになっている。
+
+### 4. クリップの管理(右側の Clips パネル)
+
+- 動画名フォルダごとにグループ化されて表示される(初期状態は折りたたみ、直近でクリップを追加した動画が上に来る)。
+- クリップ/フォルダを右クリック:
+  - **✏ Rename**: クリップ名・動画フォルダ名を変更する。
+  - **🗑 Move to Trash**: 完全削除ではなくゴミ箱に移動する。
+- 画面下の **🗑 Trash** から、ゴミ箱に入れたクリップ/フォルダを **Restore**(復元)または **Delete Permanently**(完全削除)できる。ゴミ箱内の項目は 30 日経つと自動的に完全削除される。
+- **🔄 Refresh** でクリップ一覧を再読み込みする。
+
+## データの保存場所
+
+| 内容 | 場所 |
+|---|---|
+| 書き出したクリップ | `%USERPROFILE%\Videos\MyClips\<動画名>\` |
+| ゴミ箱 | `%USERPROFILE%\Videos\MyClips\.trash\` |
+| YouTube ダウンロード先 | `%USERPROFILE%\Videos\VideoClipper\downloads` |
+| 設定(音量・再生速度) | `%APPDATA%\VideoClipper\settings.json` |
+| サムネイル/波形のキャッシュ | `%APPDATA%\VideoClipper\thumbnails`, `%APPDATA%\VideoClipper\waveforms` |
+
+## トラブルシューティング
+
+- **ダウンロードで `Requested format is not available` 等のエラーが出る**: yt-dlp を最新版に更新すると直ることが多い(YouTube 側の仕様変更に追従するため頻繁に更新される)。
+  ```bat
+  .venv\Scripts\python.exe -m pip install --upgrade yt-dlp
+  ```
+- **クリップ書き出しに失敗する**: ffmpeg が PATH に通っているか確認する(`ffmpeg -version` がコマンドラインで動くか)。

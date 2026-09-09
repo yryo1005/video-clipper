@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
+from typing import Callable
 
 import yt_dlp
 
@@ -49,10 +50,21 @@ class YouTubeDownloader:
         self.download_dir = download_dir
         self.download_dir.mkdir(parents=True, exist_ok=True)
 
-    def download(self, url: str) -> Path:
+    def download(self, url: str, progress_callback: Callable[[float], None] | None = None) -> Path:
         url = url.strip()
         if not url:
             raise DownloadError("URL is empty.")
+
+        def hook(status: dict) -> None:
+            if not progress_callback:
+                return
+            if status.get("status") == "downloading":
+                total = status.get("total_bytes") or status.get("total_bytes_estimate")
+                downloaded = status.get("downloaded_bytes")
+                if total and downloaded is not None:
+                    progress_callback(min(100.0, downloaded / total * 100.0))
+            elif status.get("status") == "finished":
+                progress_callback(100.0)
 
         outtmpl = str(self.download_dir / "downloaded_%(title)s.%(ext)s")
         ydl_opts: dict = {
@@ -69,6 +81,7 @@ class YouTubeDownloader:
                     "player_client": ["default", "-android_vr"],
                 }
             },
+            "progress_hooks": [hook],
         }
         deno = find_deno()
         if deno:
